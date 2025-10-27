@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts.meta
 guid: 7f9288f3315545a43a7f5897c244d38c
+========
+guid: 94c8e6ee345ea8f47b8b9934c5121ee3
+>>>>>>>> quan:Assets/Hexagon Generation.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}
