@@ -1,18 +1,29 @@
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController))]
-public abstract class BaseCharacterController : MonoBehaviour
+public class CharacterMovement : MonoBehaviour
 {
     [Header("Movement Settings")]
-    public float moveSpeed = 3f;
+    [Tooltip("Tốc độ đi bộ cơ bản")]
+    public float walkSpeed = 3f;
+
+    [Tooltip("Tốc độ chạy khi giữ Shift")]
+    public float runSpeed = 6f;
+
+    [Tooltip("Tốc độ xoay nhân vật")]
     public float rotationSpeed = 10f;
+
+    [Tooltip("Cho phép nhấn Shift để chạy nhanh")]
+    public bool allowRun = true;
+
+    [Header("References")]
     public Animator animator;
 
-    protected CharacterController controller;
-    protected Vector3 moveDirection = Vector3.zero;
+    private CharacterController controller;
+    private Vector3 moveDirection = Vector3.zero;
 
-    // 6 hướng cho hex (pointy-top)
-    protected Vector3[] hexDirections = new Vector3[]
+    // 6 hướng cho hex map
+    private readonly Vector3[] hexDirections = new Vector3[]
     {
         new Vector3(0, 0, 1),                          // 0° - lên
         new Vector3(Mathf.Sqrt(3)/2, 0, 0.5f),         // 60°
@@ -22,20 +33,20 @@ public abstract class BaseCharacterController : MonoBehaviour
         new Vector3(-Mathf.Sqrt(3)/2, 0, 0.5f)         // 300°
     };
 
-    protected virtual void Start()
+    private void Start()
     {
         controller = GetComponent<CharacterController>();
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
     }
 
-    protected virtual void Update()
+    private void Update()
     {
         HandleMovement();
         UpdateAnimation();
     }
 
-    protected virtual void HandleMovement()
+    private void HandleMovement()
     {
         int moveIndex = -1;
 
@@ -47,12 +58,16 @@ public abstract class BaseCharacterController : MonoBehaviour
         else if (Input.GetKey(KeyCode.A)) moveIndex = 4;
         else if (Input.GetKey(KeyCode.Q)) moveIndex = 5;
 
+        bool isRunning = allowRun && Input.GetKey(KeyCode.LeftShift);
+
         if (moveIndex >= 0)
         {
             moveDirection = hexDirections[moveIndex];
-            controller.Move(moveDirection * moveSpeed * Time.deltaTime);
+            float currentSpeed = isRunning ? runSpeed : walkSpeed;
 
-            // Xoay theo hướng di chuyển
+            controller.Move(moveDirection * currentSpeed * Time.deltaTime);
+
+           
             Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
@@ -62,11 +77,19 @@ public abstract class BaseCharacterController : MonoBehaviour
         }
     }
 
-    protected virtual void UpdateAnimation()
+    private void UpdateAnimation()
     {
-        if (animator != null)
+        if (animator == null) return;
+
+        float speedValue = 0f;
+
+        if (moveDirection.magnitude > 0.1f)
         {
-            animator.SetFloat("Speed", moveDirection.magnitude);
+            bool isRunning = allowRun && Input.GetKey(KeyCode.LeftShift);
+            // 0 = idle, 0.5 = walk, 1 = run
+            speedValue = isRunning ? 1f : 0.5f;
         }
+
+        animator.SetFloat("Speed", speedValue, 0.1f, Time.deltaTime);
     }
 }
