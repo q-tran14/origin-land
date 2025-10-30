@@ -1,43 +1,49 @@
+using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 
+[ExecuteInEditMode] // cho phép chạy trong Editor để test dễ hơn
 public class HexMapProceduralGenerator : MonoBehaviour
 {
     [System.Serializable]
     public class BiomeType
     {
-        public string name;             // Name des Bioms
-        public GameObject[] mapTiles;   // Array der Map Tiles für dieses Biom
-        public float percentage;        // Prozentuale Häufigkeit dieses Bioms
-        public bool isWater;            // Gibt an, ob es sich um ein Wasser-Biom handelt
+        public string name;
+        public GameObject[] mapTiles;
+        [Range(0f, 1f)] public float percentage;
+        public bool isWater;
     }
 
-    [Tooltip("Your biomes. Contains the name, mapTiles and the weight.")]
-    public BiomeType[] biomes;          // Array der verschiedenen Biome
-    [Tooltip("Map width size")]
-    public int mapWidth = 10;           // Breite der Karte
-    [Tooltip("Map height size")]
-    public int mapHeight = 10;          // Höhe der Karte
-    [Tooltip("Perlin noise scale")]
-    public float scale = 1.0f;          // Skala für das Perlin-Rauschen
-    private float xOffsetRange = 200f;  // Bereich für das zufällige x-Offset
-    private float yOffsetRange = 200f;  // Bereich für das zufällige y-Offset
-    [Tooltip("Ocean width relative to map size")]
-    public float oceanWidth = 0.3f;     // Breite des Ozeans relativ zur Kartengröße
-    [Tooltip("Spacing between tiles")]
-    public float tileSpacing = 1.0f;    // Tile spacing for square tile
+    [Header("Map Settings")]
+    public BiomeType[] biomes;
+    public int mapWidth = 10;
+    public int mapHeight = 10;
+    public float scale = 1.0f;
+    public float oceanWidth = 0.3f;
+    public float tileSpacing = 1.0f;
 
+    [Header("NavMesh Settings")]
+    public NavMeshSurface navMeshSurface;
+
+    private const float xOffsetRange = 200f;
+    private const float yOffsetRange = 200f;
 
     void Start()
     {
         Random.InitState(System.Environment.TickCount);
         GenerateMap();
     }
+
     public void ClearMap()
     {
         Transform oldHolder = transform.Find("MapHolder");
         if (oldHolder != null)
         {
-            DestroyImmediate(oldHolder.gameObject);
+            // Dọn sạch trong Editor mà không cần Play
+            if (Application.isPlaying)
+                Destroy(oldHolder.gameObject);
+            else
+                DestroyImmediate(oldHolder.gameObject);
         }
     }
 
@@ -45,8 +51,8 @@ public class HexMapProceduralGenerator : MonoBehaviour
     {
         ClearMap();
 
-        GameObject holderObject = new GameObject("MapHolder"); // Erstelle ein neues GameObject als Holder
-        holderObject.transform.parent = transform; // Mache das Holder-Objekt zum Kind des TerrainGenerator-Objekts
+        GameObject holderObject = new GameObject("MapHolder");
+        holderObject.transform.parent = transform;
 
         float xOffset = Random.Range(-xOffsetRange, xOffsetRange);
         float yOffset = Random.Range(-yOffsetRange, yOffsetRange);
@@ -61,40 +67,92 @@ public class HexMapProceduralGenerator : MonoBehaviour
                 float yCoord = ((float)y / mapHeight + yOffset) * scale;
                 float sample = Mathf.PerlinNoise(xCoord, yCoord) - falloffMap[x, y];
 
-                GameObject mapTile = DetermineMapTile(sample);
+                GameObject mapTilePrefab = DetermineMapTile(sample);
+                if (mapTilePrefab == null) continue;
 
-                // Vector3 position = new Vector3(x * tileSpacing, 0, y * tileSpacing); // For square tile
-
-                // === Flat-top hex placement ===
-                float hexWidth = 2f;      // prefab X size
-                float hexHeight = 2.309f; // prefab Z size
-
+                float hexWidth = 2f;
+                float hexHeight = 2.309f;
                 float posX = x * hexWidth + (y % 2 == 1 ? hexWidth / 2f : 0f);
                 float posZ = y * (hexHeight * 0.75f);
-
                 Vector3 position = new Vector3(posX, 0, posZ);
 
-                GameObject tileInstance = Instantiate(mapTile, position, Quaternion.identity);
-                tileInstance.transform.parent = holderObject.transform; // Make the tile a child of the holder object
+                GameObject tileInstance = Instantiate(mapTilePrefab, position, Quaternion.identity, holderObject.transform);
+                tileInstance.name = mapTilePrefab.name; // xóa (Clone)
 
-                /*// Set Tag base on chosen Biome
-                foreach (BiomeType biome in biomes)
+                ApplyLayerAndNavModifier(tileInstance);
+            }
+        }
+
+        // ✅ Sau khi sinh map, build lại NavMesh
+        if (navMeshSurface != null)
+        {
+            Debug.Log("Rebuilding NavMesh...");
+            navMeshSurface.RemoveData(); // tránh build chồng
+            navMeshSurface.BuildNavMesh();
+        }
+        else
+        {
+            Debug.LogWarning("NavMeshSurface not assigned!");
+        }
+    }
+
+    void ApplyLayerAndNavModifier(GameObject tileInstance)
+    {
+        // Tìm biome tương ứng
+        BiomeType biomeType = null;
+        foreach (BiomeType biome in biomes)
+        {
+            foreach (var prefab in biome.mapTiles)
+            {
+                if (prefab != null && prefab.name == tileInstance.name)
                 {
-                    float randomValue = Random.Range(0f, 100f);
-                    if (randomValue <= biome.percentage)
-                    {
-                        tileInstance.tag = biome.name;
-                        break;
-                    }
-                }*/
+                    biomeType = biome;
+                    break;
+                }
+            }
+            if (biomeType != null) break;
+        }
+
+        if (biomeType == null)
+        {
+            Debug.LogWarning($"Không tìm thấy biome cho tile {tileInstance.name}");
+            return;
+        }
+
+        // ✅ Gán layer Ground hoặc Water
+        string targetLayer = biomeType.isWater ? "Water" : "Ground";
+        int layerIndex = LayerMask.NameToLayer(targetLayer);
+        if (layerIndex == -1)
+        {
+            Debug.LogWarning($"⚠ Layer '{targetLayer}' chưa tồn tại! Tạo trong Edit > Project Settings > Tags and Layers.");
+            return;
+        }
+        tileInstance.layer = layerIndex;
+
+        // ✅ NavMeshModifier để loại Water
+        var modifier = tileInstance.GetComponent<NavMeshModifier>();
+        if (modifier == null) modifier = tileInstance.AddComponent<NavMeshModifier>();
+
+        modifier.overrideArea = true;
+        modifier.area = biomeType.isWater
+            ? NavMesh.GetAreaFromName("Not Walkable")
+            : NavMesh.GetAreaFromName("Walkable");
+
+        // ✅ Đảm bảo mesh có thể đọc NavMesh runtime (fix lỗi read access)
+        var meshFilters = tileInstance.GetComponentsInChildren<MeshFilter>();
+        foreach (var mf in meshFilters)
+        {
+            if (mf.sharedMesh != null && !mf.sharedMesh.isReadable)
+            {
+                Debug.LogWarning($"Mesh '{mf.sharedMesh.name}' của {tileInstance.name} không cho đọc. " +
+                                 $"→ Mở import settings của nó và tick 'Read/Write Enabled'.");
             }
         }
     }
 
     GameObject DetermineMapTile(float sample)
     {
-        // Determine the biome based on the Perlin noise value
-        if (sample <= 0) // If the sample value is less than or equal to zero, use the water biome 
+        if (sample <= 0)
         {
             return GetWaterTile();
         }
@@ -105,13 +163,11 @@ public class HexMapProceduralGenerator : MonoBehaviour
             cumulativePercentage += biome.percentage;
             if (sample * 100f <= cumulativePercentage)
             {
-                // Randomly select a map tile from this biome's array  
                 int index = Random.Range(0, biome.mapTiles.Length);
                 return biome.mapTiles[index];
             }
         }
 
-        // Default: Return the last biome if no biome was selected  
         BiomeType defaultBiome = biomes[biomes.Length - 1];
         int defaultIndex = Random.Range(0, defaultBiome.mapTiles.Length);
         return defaultBiome.mapTiles[defaultIndex];
@@ -119,43 +175,38 @@ public class HexMapProceduralGenerator : MonoBehaviour
 
     GameObject GetWaterTile()
     {
-        // Randomly select a water tile from the biomes that are marked as water
         foreach (BiomeType biome in biomes)
         {
-            if (biome.isWater)
+            if (biome.isWater && biome.mapTiles.Length > 0)
             {
                 int index = Random.Range(0, biome.mapTiles.Length);
                 return biome.mapTiles[index];
             }
         }
-        return null; // Fallback in case no water biome is found
+        return null;
     }
 
     float[,] GenerateFalloffMap(int width, int height)
     {
         float[,] map = new float[width, height];
-
         for (int i = 0; i < width; i++)
         {
             for (int j = 0; j < height; j++)
             {
                 float x = i / (float)width * 2 - 1;
                 float y = j / (float)height * 2 - 1;
-
                 float value = Mathf.Max(Mathf.Abs(x), Mathf.Abs(y));
                 map[i, j] = Evaluate(value);
             }
         }
-
         return map;
     }
 
     float Evaluate(float value)
     {
-        float a = 3;
+        float a = 3f;
         float b = 2.2f;
-
-        // Use oceanWidth to adjust the transition to the water zone
-        return Mathf.Pow(value * oceanWidth, a) / (Mathf.Pow(value * oceanWidth, a) + Mathf.Pow(b - b * value * oceanWidth, a));
+        return Mathf.Pow(value * oceanWidth, a) /
+               (Mathf.Pow(value * oceanWidth, a) + Mathf.Pow(b - b * value * oceanWidth, a));
     }
 }
