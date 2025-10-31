@@ -3,7 +3,7 @@ using UnityEngine;
 public class ObjSpawn : MonoBehaviour
 {
     [System.Serializable]
-    public class assetsToSpawn
+    public class objsToSpawn
     {
         [Tooltip("Name of your asset")]
         public string assetName;
@@ -12,7 +12,7 @@ public class ObjSpawn : MonoBehaviour
         public int probabilityToSpawn;
     }
 
-    public assetsToSpawn[] assets;
+    public objsToSpawn[] obj;
     [Tooltip("Probability to spawn nothing")]
     public int probabilityToSpawnNothing;
 
@@ -29,8 +29,9 @@ public class ObjSpawn : MonoBehaviour
 
     GameObject SelectRandomAsset()
     {
+        if (obj == null || obj.Length == 0) return null;
         int totalProbability = probabilityToSpawnNothing;
-        foreach (assetsToSpawn asset in assets)
+        foreach (objsToSpawn asset in obj)
         {
             totalProbability += asset.probabilityToSpawn;
         }
@@ -45,7 +46,7 @@ public class ObjSpawn : MonoBehaviour
 
         cumulativeProbability += probabilityToSpawnNothing;
 
-        foreach (assetsToSpawn asset in assets)
+        foreach (objsToSpawn asset in obj)
         {
             cumulativeProbability += asset.probabilityToSpawn;
             if (randomValue < cumulativeProbability)
@@ -54,7 +55,7 @@ public class ObjSpawn : MonoBehaviour
             }
         }
 
-        return assets[0].asset;
+        return obj[0].asset;
     }
 
     Vector3 GetRandomSpawnPosition()
