@@ -12,6 +12,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
         public GameObject[] mapTiles;
         [Range(0f, 1f)] public float percentage;
         public bool isWater;
+        public bool isWall;
     }
 
     [Header("Map Settings")]
@@ -45,6 +46,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
             else
                 DestroyImmediate(oldHolder.gameObject);
         }
+        navMeshSurface.RemoveData();
     }
 
     public void GenerateMap()
@@ -120,7 +122,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
         }
 
         // ✅ Gán layer Ground hoặc Water
-        string targetLayer = biomeType.isWater ? "Water" : "Ground";
+        string targetLayer = biomeType.isWater ? "Water" : biomeType.isWall ? "Wall" : "Ground";
         int layerIndex = LayerMask.NameToLayer(targetLayer);
         if (layerIndex == -1)
         {
@@ -136,7 +138,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
         modifier.overrideArea = true;
         modifier.area = biomeType.isWater
             ? NavMesh.GetAreaFromName("Not Walkable")
-            : NavMesh.GetAreaFromName("Walkable");
+            : biomeType.isWall ? NavMesh.GetAreaFromName("Not Walkable") : NavMesh.GetAreaFromName("Walkable");
 
         // ✅ Đảm bảo mesh có thể đọc NavMesh runtime (fix lỗi read access)
         var meshFilters = tileInstance.GetComponentsInChildren<MeshFilter>();
