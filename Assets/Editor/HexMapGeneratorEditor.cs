@@ -12,6 +12,7 @@ public class HexMapGeneratorEditor : Editor
         HexMapProceduralGenerator generator = (HexMapProceduralGenerator)target;
         if (GUILayout.Button("Generate Map"))
         {
+            
             generator.GenerateMap();
         }
         if (GUILayout.Button("Clear Map"))

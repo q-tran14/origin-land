@@ -30,6 +30,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
 
     void Start()
     {
+        ClearMap();
         Random.InitState(System.Environment.TickCount);
         GenerateMap();
     }
@@ -77,6 +78,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
                 Vector3 position = new Vector3(posX, 0, posZ);
 
                 GameObject tileInstance = Instantiate(mapTilePrefab, position, Quaternion.identity, holderObject.transform);
+                
                 tileInstance.name = mapTilePrefab.name; // xóa (Clone)
 
                 ApplyLayerAndNavModifier(tileInstance);
@@ -90,10 +92,7 @@ public class HexMapProceduralGenerator : MonoBehaviour
             navMeshSurface.RemoveData(); // tránh build chồng
             navMeshSurface.BuildNavMesh();
         }
-        else
-        {
-            Debug.LogWarning("NavMeshSurface not assigned!");
-        }
+        else Debug.LogWarning("NavMeshSurface not assigned!");
     }
 
     void ApplyLayerAndNavModifier(GameObject tileInstance)
@@ -206,7 +205,6 @@ public class HexMapProceduralGenerator : MonoBehaviour
     {
         float a = 3f;
         float b = 2.2f;
-        return Mathf.Pow(value * oceanWidth, a) /
-               (Mathf.Pow(value * oceanWidth, a) + Mathf.Pow(b - b * value * oceanWidth, a));
+        return Mathf.Pow(value * oceanWidth, a) / (Mathf.Pow(value * oceanWidth, a) + Mathf.Pow(b - b * value * oceanWidth, a));
     }
 }
