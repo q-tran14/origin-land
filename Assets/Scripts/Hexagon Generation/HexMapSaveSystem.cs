@@ -4,7 +4,7 @@ using UnityEngine;
 
 public static class HexMapSaveSystem
 {
-    private static readonly string SaveFolder = Path.Combine(Application.dataPath, "Maps");
+    private static readonly string SaveFolder = Path.Combine(Application.dataPath, "Maps/Seeds");
 
     public static void SaveMap(MapSaveData mapData)
     {
