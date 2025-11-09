@@ -4,92 +4,84 @@ using UnityEngine;
 public class CharacterMovement : MonoBehaviour
 {
     [Header("Movement Settings")]
-    [Tooltip("Tốc độ đi bộ cơ bản")]
-    public float walkSpeed = 3f;
-
-    [Tooltip("Tốc độ chạy khi giữ Shift")]
-    public float runSpeed = 6f;
-
-    [Tooltip("Tốc độ xoay nhân vật")]
+    public float walkSpeed = 5f;
+    public float runSpeed = 8f;
+    public float jumpForce = 10f;
     public float rotationSpeed = 10f;
-
-    [Tooltip("Cho phép nhấn Shift để chạy nhanh")]
     public bool allowRun = true;
 
     [Header("References")]
     public Animator animator;
+    public Camera mainCamera;
+    [HideInInspector] public CharacterController controller;
+    [HideInInspector] public Vector3 moveDirection;
 
-    private CharacterController controller;
-    private Vector3 moveDirection = Vector3.zero;
-
-    // 6 hướng cho hex map
-    private readonly Vector3[] hexDirections = new Vector3[]
-    {
-        new Vector3(0, 0, 1),                          // 0° - lên
-        new Vector3(Mathf.Sqrt(3)/2, 0, 0.5f),         // 60°
-        new Vector3(Mathf.Sqrt(3)/2, 0, -0.5f),        // 120°
-        new Vector3(0, 0, -1),                         // 180°
-        new Vector3(-Mathf.Sqrt(3)/2, 0, -0.5f),       // 240°
-        new Vector3(-Mathf.Sqrt(3)/2, 0, 0.5f)         // 300°
-    };
+    // FSM
+    private ICharacterState currentState;
+    [HideInInspector] public IdleState idleState = new();
+    [HideInInspector] public WalkState walkState = new();
+    [HideInInspector] public RunState runState = new();
+    [HideInInspector] public JumpState jumpState = new();
+    [HideInInspector] public AttackState attackState = new();
+    [HideInInspector] public CheerState cheerState = new();
+    [HideInInspector] public DeathState deathState = new();
 
     private void Start()
     {
         controller = GetComponent<CharacterController>();
-        if (animator == null)
-            animator = GetComponentInChildren<Animator>();
+        if (!animator) animator = GetComponentInChildren<Animator>();
+        if (!mainCamera) mainCamera = Camera.main;
+        
+        
+        
+        animator.applyRootMotion = false;
+
+        animator.SetLayerWeight(1, 0f);
+        SwitchState(idleState);
+
     }
 
     private void Update()
     {
-        HandleMovement();
-        UpdateAnimation();
+        if (currentState is DeathState) return;
+
+        // --- Attack ---
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (currentState is AttackState attack)
+                attack.OnClick(this);
+            else
+                SwitchState(attackState);
+        }
+        // --- Cheer ---
+        if (Input.GetKeyDown(KeyCode.G) && currentState is not CheerState)
+            SwitchState(cheerState);
+
+        // --- Jump ---
+        if (Input.GetKeyDown(KeyCode.Space)) // grounded để tránh nhảy liên tục
+        {
+            
+            SwitchState(jumpState);
+        }
+
+        // --- Death ---
+        if (Input.GetKeyDown(KeyCode.K) && currentState is not DeathState)
+            Die();
+
+        currentState?.UpdateState(this);
     }
 
-    private void HandleMovement()
+    public void SwitchState(ICharacterState newState)
     {
-        int moveIndex = -1;
-
-        // 6 phím tương ứng 6 hướng
-        if (Input.GetKey(KeyCode.W)) moveIndex = 0;
-        else if (Input.GetKey(KeyCode.E)) moveIndex = 1;
-        else if (Input.GetKey(KeyCode.D)) moveIndex = 2;
-        else if (Input.GetKey(KeyCode.S)) moveIndex = 3;
-        else if (Input.GetKey(KeyCode.A)) moveIndex = 4;
-        else if (Input.GetKey(KeyCode.Q)) moveIndex = 5;
-
-        bool isRunning = allowRun && Input.GetKey(KeyCode.LeftShift);
-
-        if (moveIndex >= 0)
-        {
-            moveDirection = hexDirections[moveIndex];
-            float currentSpeed = isRunning ? runSpeed : walkSpeed;
-
-            controller.Move(moveDirection * currentSpeed * Time.deltaTime);
-
-           
-            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-        }
-        else
-        {
-            moveDirection = Vector3.zero;
-        }
+        if (currentState == newState) return;
+        currentState?.ExitState(this);
+        currentState = newState;
+        currentState.EnterState(this);
     }
-
-    private void UpdateAnimation()
+        public void Die()
     {
-        if (animator == null) return;
-
-        float speedValue = 0f;
-
-        if (moveDirection.magnitude > 0.1f)
-        {
-            bool isRunning = allowRun && Input.GetKey(KeyCode.LeftShift);
-            // 0 = idle, 0.5 = walk, 1 = run
-            speedValue = isRunning ? 1f : 0.5f;
-        }
-
-        animator.SetFloat("Speed", speedValue, 0.1f, Time.deltaTime);
+        if (currentState is not DeathState)
+            SwitchState(deathState);
     }
+
 }
