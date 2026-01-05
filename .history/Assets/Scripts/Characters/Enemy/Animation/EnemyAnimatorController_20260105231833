@@ -1,0 +1,30 @@
+using UnityEngine;
+
+public class PlayerAnimatorController : MonoBehaviour
+{
+    Animator anim;
+
+    void Awake()
+    {
+        anim = GetComponent<Animator>();
+    }
+
+    public void SetSpeed(float speed)
+    {
+        anim.SetFloat("Speed", speed);
+    }
+    public void Hit()
+    {
+        anim.SetTrigger("Hit");
+    }
+
+    public void Die()
+    {
+        anim.SetBool("IsDead", true);
+    }
+
+    public void Spawn()
+    {
+        anim.SetTrigger("Spawn");
+    }
+}

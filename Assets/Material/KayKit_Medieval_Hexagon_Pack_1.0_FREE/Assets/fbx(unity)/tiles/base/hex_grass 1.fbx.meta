@@ -8,7 +8,7 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: hexagons_medieval
-    second: {fileID: 2100000, guid: cbc2b15a2367927469c1b1acbccc0e0b, type: 2}
+    second: {fileID: 2100000, guid: b156e692c60fa294fab883ac27f8949c, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
